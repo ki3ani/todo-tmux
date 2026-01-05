@@ -17,10 +17,17 @@ func startServer() {
 	staticFS, _ := fs.Sub(content, "static")
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// API routes
+	// Todo API routes
 	http.HandleFunc("/api/todos", handleAPITodos)
 	http.HandleFunc("/api/todos/", handleAPITodo)
 	http.HandleFunc("/api/categories", handleAPICategories)
+
+	// Vault API routes
+	http.HandleFunc("/api/vault", handleAPIVault)
+	http.HandleFunc("/api/vault/resurface", handleAPIVaultResurface)
+	http.HandleFunc("/api/vault/detect", handleAPIVaultDetect)
+	http.HandleFunc("/api/vault/", handleAPIVaultItem)
+	http.HandleFunc("/api/tags", handleAPITags)
 
 	// Serve main page
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +46,7 @@ func startServer() {
 
 	// Get local IP for display
 	ip := getLocalIP()
-	fmt.Println("Todo Web UI starting...")
+	fmt.Println("Vault starting...")
 	fmt.Println()
 	fmt.Printf("  Local:   http://localhost:8080\n")
 	if ip != "" {

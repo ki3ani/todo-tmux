@@ -15,12 +15,47 @@ func main() {
 	defer CloseDB()
 
 	if len(os.Args) < 2 {
-		printUsage()
+		printVaultUsage()
 		return
 	}
 
 	cmd := os.Args[1]
 
+	// Vault commands
+	switch cmd {
+	case "save":
+		handleVaultSave()
+		return
+	case "note":
+		handleVaultNote()
+		return
+	case "random", "resurface":
+		handleVaultRandom()
+		return
+	case "pin":
+		handleVaultPin(true)
+		return
+	case "unpin":
+		handleVaultPin(false)
+		return
+	case "archive":
+		handleVaultArchive(true)
+		return
+	case "unarchive":
+		handleVaultArchive(false)
+		return
+	case "tags":
+		handleVaultTags()
+		return
+	case "tag":
+		handleVaultSetTags()
+		return
+	case "items":
+		handleVaultList()
+		return
+	}
+
+	// Todo commands (backwards compatible)
 	switch cmd {
 	case "add":
 		handleAdd()
@@ -35,33 +70,16 @@ func main() {
 	case "clear":
 		handleClear()
 	case "server":
-		runServer()
+		startServer()
 	default:
-		printUsage()
+		printVaultUsage()
 	}
 }
 
-func printUsage() {
-	fmt.Println(`todo - simple task manager
-
-Usage:
-  todo add <task> [-p high|medium|low] [-c category] [-d due-date]
-  todo list [-s done|pending] [-p priority] [-c category]
-  todo done <id>      Mark todo as done
-  todo undone <id>    Mark todo as not done
-  todo rm <id>        Remove a todo
-  todo clear          Remove all todos
-  todo server         Start web UI on port 8080
-
-Examples:
-  todo add "Buy milk" -p high -c shopping
-  todo add "Finish report" -d 2024-12-31
-  todo list -s pending -p high`)
-}
-
+// Todo CLI handlers
 func handleAdd() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: todo add <task> [-p priority] [-c category] [-d due-date]")
+		fmt.Println("Usage: vault add <task> [-p priority] [-c category] [-d due-date]")
 		return
 	}
 
@@ -146,7 +164,7 @@ func handleList() {
 	}
 
 	if len(todos) == 0 {
-		fmt.Println("No todos yet. Add one with: todo add <task>")
+		fmt.Println("No todos yet. Add one with: vault add <task>")
 		return
 	}
 
@@ -177,7 +195,7 @@ func handleList() {
 
 func handleDone() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: todo done <id>")
+		fmt.Println("Usage: vault done <id>")
 		return
 	}
 	id, err := strconv.ParseInt(os.Args[2], 10, 64)
@@ -196,7 +214,7 @@ func handleDone() {
 
 func handleUndone() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: todo undone <id>")
+		fmt.Println("Usage: vault undone <id>")
 		return
 	}
 	id, err := strconv.ParseInt(os.Args[2], 10, 64)
@@ -215,7 +233,7 @@ func handleUndone() {
 
 func handleRemove() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: todo rm <id>")
+		fmt.Println("Usage: vault rm <id>")
 		return
 	}
 	id, err := strconv.ParseInt(os.Args[2], 10, 64)
@@ -235,11 +253,6 @@ func handleRemove() {
 func handleClear() {
 	ClearTodos()
 	fmt.Println("All todos cleared")
-}
-
-// Placeholder - actual server code is in server.go
-func runServer() {
-	startServer()
 }
 
 // Ignore unused import warning for strings

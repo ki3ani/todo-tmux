@@ -24,6 +24,7 @@ func InitDB() error {
 		return err
 	}
 
+	// Todo schema
 	schema := `
 	CREATE TABLE IF NOT EXISTS todos (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +38,12 @@ func InitDB() error {
 	);
 	`
 	_, err = db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Vault schema
+	return InitVaultDB()
 }
 
 func CloseDB() {
