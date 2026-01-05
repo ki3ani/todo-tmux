@@ -1,74 +1,41 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 )
 
-type Todo struct {
-	ID   int    `json:"id"`
-	Task string `json:"task"`
-	Done bool   `json:"done"`
-}
-
-const dataFile = "todos.json"
-
 func main() {
+	if err := InitDB(); err != nil {
+		fmt.Println("Error initializing database:", err)
+		os.Exit(1)
+	}
+	defer CloseDB()
+
 	if len(os.Args) < 2 {
 		printUsage()
 		return
 	}
 
-	todos := loadTodos()
 	cmd := os.Args[1]
 
 	switch cmd {
 	case "add":
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: todo add <task>")
-			return
-		}
-		task := strings.Join(os.Args[2:], " ")
-		todos = addTodo(todos, task)
-		saveTodos(todos)
-
+		handleAdd()
 	case "list", "ls":
-		listTodos(todos)
-
+		handleList()
 	case "done":
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: todo done <id>")
-			return
-		}
-		id, err := strconv.Atoi(os.Args[2])
-		if err != nil {
-			fmt.Println("Invalid ID")
-			return
-		}
-		todos = markDone(todos, id)
-		saveTodos(todos)
-
+		handleDone()
+	case "undone":
+		handleUndone()
 	case "rm", "remove":
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: todo rm <id>")
-			return
-		}
-		id, err := strconv.Atoi(os.Args[2])
-		if err != nil {
-			fmt.Println("Invalid ID")
-			return
-		}
-		todos = removeTodo(todos, id)
-		saveTodos(todos)
-
+		handleRemove()
 	case "clear":
-		todos = []Todo{}
-		saveTodos(todos)
-		fmt.Println("All todos cleared")
-
+		handleClear()
+	case "server":
+		runServer()
 	default:
 		printUsage()
 	}
@@ -78,74 +45,202 @@ func printUsage() {
 	fmt.Println(`todo - simple task manager
 
 Usage:
-  todo add <task>   Add a new todo
-  todo list         List all todos
-  todo done <id>    Mark todo as done
-  todo rm <id>      Remove a todo
-  todo clear        Remove all todos`)
+  todo add <task> [-p high|medium|low] [-c category] [-d due-date]
+  todo list [-s done|pending] [-p priority] [-c category]
+  todo done <id>      Mark todo as done
+  todo undone <id>    Mark todo as not done
+  todo rm <id>        Remove a todo
+  todo clear          Remove all todos
+  todo server         Start web UI on port 8080
+
+Examples:
+  todo add "Buy milk" -p high -c shopping
+  todo add "Finish report" -d 2024-12-31
+  todo list -s pending -p high`)
 }
 
-func loadTodos() []Todo {
-	data, err := os.ReadFile(dataFile)
+func handleAdd() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: todo add <task> [-p priority] [-c category] [-d due-date]")
+		return
+	}
+
+	args := os.Args[2:]
+	task := ""
+	priority := PriorityMedium
+	category := ""
+	dueDate := ""
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-p":
+			if i+1 < len(args) {
+				priority = Priority(args[i+1])
+				i++
+			}
+		case "-c":
+			if i+1 < len(args) {
+				category = args[i+1]
+				i++
+			}
+		case "-d":
+			if i+1 < len(args) {
+				dueDate = args[i+1]
+				i++
+			}
+		default:
+			if task == "" {
+				task = args[i]
+			} else {
+				task += " " + args[i]
+			}
+		}
+	}
+
+	if task == "" {
+		fmt.Println("Please provide a task")
+		return
+	}
+
+	todo, err := CreateTodo(task, priority, category, dueDate)
 	if err != nil {
-		return []Todo{}
+		fmt.Println("Error:", err)
+		return
 	}
-	var todos []Todo
-	json.Unmarshal(data, &todos)
-	return todos
-}
-
-func saveTodos(todos []Todo) {
-	data, _ := json.MarshalIndent(todos, "", "  ")
-	os.WriteFile(dataFile, data, 0644)
-}
-
-func addTodo(todos []Todo, task string) []Todo {
-	id := 1
-	if len(todos) > 0 {
-		id = todos[len(todos)-1].ID + 1
+	fmt.Printf("Added: [%d] %s\n", todo.ID, todo.Task)
+	if category != "" {
+		fmt.Printf("  Category: %s\n", category)
 	}
-	todo := Todo{ID: id, Task: task, Done: false}
-	todos = append(todos, todo)
-	fmt.Printf("Added: [%d] %s\n", id, task)
-	return todos
+	if dueDate != "" {
+		fmt.Printf("  Due: %s\n", dueDate)
+	}
 }
 
-func listTodos(todos []Todo) {
+func handleList() {
+	filter := TodoFilter{}
+
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "-s":
+			if i+1 < len(os.Args) {
+				filter.Status = os.Args[i+1]
+				i++
+			}
+		case "-p":
+			if i+1 < len(os.Args) {
+				filter.Priority = os.Args[i+1]
+				i++
+			}
+		case "-c":
+			if i+1 < len(os.Args) {
+				filter.Category = os.Args[i+1]
+				i++
+			}
+		}
+	}
+
+	todos, err := GetTodos(filter)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
 	if len(todos) == 0 {
 		fmt.Println("No todos yet. Add one with: todo add <task>")
 		return
 	}
+
 	fmt.Println()
 	for _, t := range todos {
 		status := " "
 		if t.Done {
 			status = "x"
 		}
-		fmt.Printf("  [%s] %d. %s\n", status, t.ID, t.Task)
+		priorityIcon := ""
+		switch t.Priority {
+		case PriorityHigh:
+			priorityIcon = "!"
+		case PriorityLow:
+			priorityIcon = "-"
+		}
+		extra := ""
+		if t.Category != "" {
+			extra += fmt.Sprintf(" [%s]", t.Category)
+		}
+		if t.DueDate != "" {
+			extra += fmt.Sprintf(" (due: %s)", t.DueDate)
+		}
+		fmt.Printf("  [%s]%s %d. %s%s\n", status, priorityIcon, t.ID, t.Task, extra)
 	}
 	fmt.Println()
 }
 
-func markDone(todos []Todo, id int) []Todo {
-	for i, t := range todos {
-		if t.ID == id {
-			todos[i].Done = true
-			fmt.Printf("Done: [%d] %s\n", id, t.Task)
-			return todos
-		}
+func handleDone() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: todo done <id>")
+		return
 	}
-	fmt.Println("Todo not found")
-	return todos
+	id, err := strconv.ParseInt(os.Args[2], 10, 64)
+	if err != nil {
+		fmt.Println("Invalid ID")
+		return
+	}
+	todo, err := GetTodo(id)
+	if err != nil {
+		fmt.Println("Todo not found")
+		return
+	}
+	MarkTodoDone(id, true)
+	fmt.Printf("Done: [%d] %s\n", id, todo.Task)
 }
 
-func removeTodo(todos []Todo, id int) []Todo {
-	for i, t := range todos {
-		if t.ID == id {
-			fmt.Printf("Removed: [%d] %s\n", id, t.Task)
-			return append(todos[:i], todos[i+1:]...)
-		}
+func handleUndone() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: todo undone <id>")
+		return
 	}
-	fmt.Println("Todo not found")
-	return todos
+	id, err := strconv.ParseInt(os.Args[2], 10, 64)
+	if err != nil {
+		fmt.Println("Invalid ID")
+		return
+	}
+	todo, err := GetTodo(id)
+	if err != nil {
+		fmt.Println("Todo not found")
+		return
+	}
+	MarkTodoDone(id, false)
+	fmt.Printf("Undone: [%d] %s\n", id, todo.Task)
 }
+
+func handleRemove() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: todo rm <id>")
+		return
+	}
+	id, err := strconv.ParseInt(os.Args[2], 10, 64)
+	if err != nil {
+		fmt.Println("Invalid ID")
+		return
+	}
+	todo, err := GetTodo(id)
+	if err != nil {
+		fmt.Println("Todo not found")
+		return
+	}
+	DeleteTodo(id)
+	fmt.Printf("Removed: [%d] %s\n", id, todo.Task)
+}
+
+func handleClear() {
+	ClearTodos()
+	fmt.Println("All todos cleared")
+}
+
+// Placeholder - actual server code is in server.go
+func runServer() {
+	startServer()
+}
+
+// Ignore unused import warning for strings
+var _ = strings.TrimSpace
