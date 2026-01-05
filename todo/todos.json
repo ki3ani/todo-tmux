@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "task": "Learn Go basics",
+    "done": true
+  },
+  {
+    "id": 2,
+    "task": "Build todo app",
+    "done": true
+  },
+  {
+    "id": 3,
+    "task": "Ship it",
+    "done": false
+  }
+]
