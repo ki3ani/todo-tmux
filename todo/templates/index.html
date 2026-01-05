@@ -3,52 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Todo</title>
+    <title>Vault</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Todo</h1>
+            <h1>Vault</h1>
+            <nav class="tabs">
+                <button class="tab active" data-view="vault">Vault</button>
+                <button class="tab" data-view="todo">Todos</button>
+            </nav>
         </header>
 
-        <form id="add-form" class="add-form">
-            <input type="text" id="task-input" placeholder="What needs to be done?" required>
-            <div class="form-row">
-                <select id="priority-input">
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="low">Low</option>
-                </select>
-                <input type="text" id="category-input" placeholder="Category">
-                <input type="date" id="due-input">
-            </div>
-            <button type="submit" class="btn-add">Add Todo</button>
-        </form>
+        <!-- Vault View -->
+        <div id="vault-view" class="view active">
+            <form id="vault-add-form" class="add-form">
+                <input type="text" id="vault-input" placeholder="Paste URL or write a note...">
+                <div class="input-preview" id="input-preview"></div>
+                <div class="form-row">
+                    <input type="text" id="vault-tags" placeholder="Tags (comma separated)">
+                    <label class="pin-toggle">
+                        <input type="checkbox" id="vault-pin">
+                        <span>Pin</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn-add">Save to Vault</button>
+            </form>
 
-        <div class="filters">
-            <select id="filter-status">
-                <option value="">All</option>
-                <option value="pending">Pending</option>
-                <option value="done">Done</option>
-            </select>
-            <select id="filter-priority">
-                <option value="">Any Priority</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-            </select>
-            <select id="filter-category">
-                <option value="">Any Category</option>
-            </select>
-            <input type="text" id="filter-search" placeholder="Search...">
+            <div id="resurface-banner" class="resurface-banner" style="display:none;">
+                <div class="resurface-label">From your vault</div>
+                <div id="resurface-content"></div>
+                <div class="resurface-actions">
+                    <button class="btn-dismiss" onclick="dismissResurface()">Dismiss</button>
+                    <button class="btn-resurface" onclick="loadResurface()">Another</button>
+                </div>
+            </div>
+
+            <div class="filters">
+                <select id="vault-filter-type">
+                    <option value="">All Types</option>
+                    <option value="tweet">Tweets</option>
+                    <option value="tiktok">TikToks</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="article">Articles</option>
+                    <option value="note">Notes</option>
+                </select>
+                <input type="text" id="vault-search" placeholder="Search...">
+            </div>
+
+            <div id="vault-tags-filter" class="tags-filter"></div>
+            <div id="vault-items" class="vault-items"></div>
+            <div id="vault-empty" class="empty-state" style="display:none;">
+                <p>Your vault is empty</p>
+                <p class="hint">Save links and notes above</p>
+            </div>
         </div>
 
-        <ul id="todo-list" class="todo-list"></ul>
+        <!-- Todos View -->
+        <div id="todo-view" class="view">
+            <form id="add-form" class="add-form">
+                <input type="text" id="task-input" placeholder="What needs to be done?" required>
+                <div class="form-row">
+                    <select id="priority-input">
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <input type="text" id="category-input" placeholder="Category">
+                    <input type="date" id="due-input">
+                </div>
+                <button type="submit" class="btn-add">Add Todo</button>
+            </form>
 
-        <div id="empty-state" class="empty-state" style="display:none;">
-            <p>No todos yet!</p>
-            <p class="hint">Add your first task above</p>
+            <div class="filters">
+                <select id="filter-status">
+                    <option value="">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="done">Done</option>
+                </select>
+                <select id="filter-priority">
+                    <option value="">Any Priority</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+                <select id="filter-category">
+                    <option value="">Any Category</option>
+                </select>
+                <input type="text" id="filter-search" placeholder="Search...">
+            </div>
+
+            <ul id="todo-list" class="todo-list"></ul>
+            <div id="empty-state" class="empty-state" style="display:none;">
+                <p>No todos yet!</p>
+                <p class="hint">Add your first task above</p>
+            </div>
         </div>
     </div>
 
@@ -67,6 +117,22 @@
                 <input type="date" id="edit-due">
                 <div class="modal-buttons">
                     <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="vault-edit-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>Edit Item</h2>
+            <form id="vault-edit-form">
+                <input type="hidden" id="vault-edit-id">
+                <input type="text" id="vault-edit-title" placeholder="Title">
+                <textarea id="vault-edit-content" placeholder="Content"></textarea>
+                <input type="text" id="vault-edit-tags" placeholder="Tags (comma separated)">
+                <div class="modal-buttons">
+                    <button type="button" class="btn-cancel" onclick="closeVaultModal()">Cancel</button>
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             </form>
